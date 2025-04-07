@@ -1,0 +1,11 @@
+{
+  "name": "ad",
+  "version": "1.0.0",
+  "description": "projet pour simuler le recherche locale",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Manda Arolala",
+  "license": "ISC"
+}
