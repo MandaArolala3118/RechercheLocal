@@ -154,6 +154,20 @@
       border-radius: 8px;
       border: 1px solid var(--gray);
       overflow: hidden;
+      position: relative;
+    }
+
+    #graph-tooltip {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background-color: rgba(52, 73, 94, 0.8);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      pointer-events: none;
+      z-index: 100;
     }
 
     #parameters-container {
@@ -275,31 +289,6 @@
     <div class="sidebar">
       <div class="card">
         <h2>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="16"></line>
-            <line x1="8" y1="12" x2="16" y2="12"></line>
-          </svg>
-          Ajouter un Nœud
-        </h2>
-        <div class="form-group">
-          <label for="node-id">ID du Nœud</label>
-          <input type="text" id="node-id" placeholder="Exemple: A, B, C..." maxlength="3">
-        </div>
-        <button id="add-node-btn">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="16"></line>
-            <line x1="8" y1="12" x2="16" y2="12"></line>
-          </svg>
-          Ajouter
-        </button>
-      </div>
-
-      <div class="card">
-        <h2>
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
@@ -358,7 +347,8 @@
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
-          </div><div class="parameter-tag">
+          </div>
+          <div class="parameter-tag">
             risk
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="remove-param"
@@ -389,7 +379,9 @@
           </svg>
           Visualisation du Graphe
         </h2>
-        <div id="graph-visualization"></div>
+        <div id="graph-visualization">
+          <div id="graph-tooltip">Double-cliquez pour ajouter un nœud</div>
+        </div>
       </div>
 
       <div class="card">
@@ -463,744 +455,753 @@
     </div>
   </main>
 
-  <!-- Inclure vis-network pour la visualisation -->
-
   <script src="vis-network.min.js"></script>
-  <script src="index.js"></script>
   <script>
     // Structure de données pour le graphe
-let graph = {};
-let parameters = ['distance', 'cost', 'time', 'risk']; // Paramètres par défaut
+    let graph = {};
+    let parameters = ['distance', 'cost', 'time', 'risk']; // Paramètres par défaut
+    let nodeCounter = 0; // Compteur pour générer des IDs automatiques
 
-// Fonctions pour le DOM
-document.addEventListener('DOMContentLoaded', function() {
-  // Initialiser le graphe de visualisation
-  initializeNetworkVisualization();
-  
-  // Ajouter les écouteurs d'événements pour les boutons
-  document.getElementById('add-node-btn').addEventListener('click', addNode);
-  document.getElementById('add-edge-btn').addEventListener('click', addEdge);
-  document.getElementById('add-param-btn').addEventListener('click', addParameter);
-  document.getElementById('run-algorithm-btn').addEventListener('click', runAlgorithm);
-  document.getElementById('reset-btn').addEventListener('click', resetGraph);
-  
-  // Ajouter les écouteurs pour les boutons de suppression de paramètres
-  document.querySelectorAll('.remove-param').forEach(btn => {
-    btn.addEventListener('click', function() {
-      removeParameter(this.getAttribute('data-param'));
+    // Fonctions pour le DOM
+    document.addEventListener('DOMContentLoaded', function () {
+      // Initialiser le graphe de visualisation
+      initializeNetworkVisualization();
+
+      // Ajouter les écouteurs d'événements pour les boutons
+      document.getElementById('add-edge-btn').addEventListener('click', addEdge);
+      document.getElementById('add-param-btn').addEventListener('click', addParameter);
+      document.getElementById('run-algorithm-btn').addEventListener('click', runAlgorithm);
+      document.getElementById('reset-btn').addEventListener('click', resetGraph);
+
+      // Ajouter les écouteurs pour les boutons de suppression de paramètres
+      document.querySelectorAll('.remove-param').forEach(btn => {
+        btn.addEventListener('click', function () {
+          removeParameter(this.getAttribute('data-param'));
+        });
+      });
+
+      // Initialiser les paramètres pour les arêtes
+      updateEdgeParametersForm();
+
+      // Charger un exemple de graphe
+      loadExampleGraph();
+
+      // Mettre à jour les sliders de pondérations
+      updateWeightSliders();
+
+      // Afficher le tooltip pendant quelques secondes puis le cacher
+      setTimeout(() => {
+        const tooltip = document.getElementById('graph-tooltip');
+        tooltip.style.opacity = '0';
+        setTimeout(() => {
+          tooltip.style.display = 'none';
+        }, 1000);
+      }, 5000);
     });
-  });
-  
-  // Initialiser les paramètres pour les arêtes
-  updateEdgeParametersForm();
-  
-  // Charger un exemple de graphe (optionnel)
-  loadExampleGraph();
-  
-  // Mettre à jour les sliders de pondérations
-  updateWeightSliders();
-});
 
-// Variables pour la visualisation
-let nodes, edges, network;
+    // Variables pour la visualisation
+    let nodes, edges, network;
 
-function initializeNetworkVisualization() {
-  // Créer les collections de données pour vis.js
-  nodes = new vis.DataSet([]);
-  edges = new vis.DataSet([]);
-  
-  // Options pour le réseau
-  const options = {
-    nodes: {
-      shape: 'circle',
-      size: 30,
-      font: {
-        size: 14,
-        color: '#ffffff'
-      },
-      borderWidth: 2,
-      color: {
-        background: '#3498db',
-        border: '#2980b9',
-        highlight: {
-          background: '#2ecc71',
-          border: '#27ae60'
+    function initializeNetworkVisualization() {
+      // Créer les collections de données pour vis.js
+      nodes = new vis.DataSet([]);
+      edges = new vis.DataSet([]);
+
+      // Options pour le réseau
+      const options = {
+        nodes: {
+          shape: 'circle',
+          size: 30,
+          font: {
+            size: 14,
+            color: '#ffffff'
+          },
+          borderWidth: 2,
+          color: {
+            background: '#3498db',
+            border: '#2980b9',
+            highlight: {
+              background: '#2ecc71',
+              border: '#27ae60'
+            }
+          }
+        },
+        edges: {
+          width: 2,
+          color: {
+            color: '#bdc3c7',
+            highlight: '#2ecc71'
+          },
+          font: {
+            size: 12,
+            align: 'middle'
+          },
+          arrows: {
+            to: { enabled: true, scaleFactor: 0.5 }
+          }
+        },
+        physics: {
+          enabled: true,
+          solver: 'forceAtlas2Based',
+          forceAtlas2Based: {
+            gravitationalConstant: -50,
+            springLength: 200,
+            springConstant: 0.08
+          }
+        },
+        interaction: {
+          hover: true,
+          navigationButtons: true,
+          keyboard: true
         }
-      }
-    },
-    edges: {
-      width: 2,
-      color: {
-        color: '#bdc3c7',
-        highlight: '#2ecc71'
-      },
-      font: {
-        size: 12,
-        align: 'middle'
-      },
-      arrows: {
-        to: { enabled: true, scaleFactor: 0.5 }
-      }
-    },
-    physics: {
-      enabled: true,
-      solver: 'forceAtlas2Based',
-      forceAtlas2Based: {
-        gravitationalConstant: -50,
-        springLength: 200,
-        springConstant: 0.08
-      }
-    },
-    interaction: {
-      hover: true,
-      navigationButtons: true,
-      keyboard: true
+      };
+
+      // Configurer le réseau
+      const container = document.getElementById('graph-visualization');
+      network = new vis.Network(container, { nodes, edges }, options);
+
+      // Ajouter des écouteurs d'événements au réseau
+      network.on('click', function (params) {
+        if (params.nodes.length > 0) {
+          const nodeId = params.nodes[0];
+          highlightConnections(nodeId);
+        }
+      });
+
+      // Ajouter l'écouteur pour le double-clic
+      network.on('doubleClick', function (params) {
+        // Vérifier si l'utilisateur a double-cliqué sur un espace vide (pas sur un nœud existant)
+        if (params.nodes.length === 0) {
+          // Générer un ID automatique
+          const nodeId = generateNodeId();
+
+          // Ajouter le nœud au graphe
+          graph[nodeId] = {};
+
+          // Ajouter le nœud à la visualisation à l'endroit du clic
+          nodes.add({
+            id: nodeId,
+            label: nodeId,
+            x: params.pointer.canvas.x,
+            y: params.pointer.canvas.y
+          });
+
+          // Mettre à jour les listes déroulantes
+          updateNodeSelectors();
+        }
+      });
     }
-  };
-  
-  // Configurer le réseau
-  const container = document.getElementById('graph-visualization');
-  network = new vis.Network(container, { nodes, edges }, options);
-  
-  // Ajouter des écouteurs d'événements au réseau
-  network.on('click', function(params) {
-    if (params.nodes.length > 0) {
-      const nodeId = params.nodes[0];
-      highlightConnections(nodeId);
+
+    // Fonction pour générer un ID de nœud automatique
+    function generateNodeId() {
+      // Utiliser des lettres (A, B, C, ..., Z, AA, AB, ...)
+      const nodeId = String.fromCharCode(65 + (nodeCounter % 26));
+      const prefix = nodeCounter >= 26 ? String.fromCharCode(65 + Math.floor(nodeCounter / 26) - 1) : '';
+      nodeCounter++;
+      return prefix + nodeId;
     }
-  });
-}
 
-function highlightConnections(nodeId) {
-  // Remettre toutes les arêtes à leur état normal
-  edges.forEach(edge => {
-    edges.update({ id: edge.id, color: { color: '#bdc3c7' } });
-  });
-  
-  // Mettre en évidence les connexions du nœud sélectionné
-  if (graph[nodeId]) {
-    Object.keys(graph[nodeId]).forEach(neighbor => {
-      const edgeId = `${nodeId}-${neighbor}`;
-      edges.update({ id: edgeId, color: { color: '#2ecc71' } });
-    });
-  }
-}
+    function highlightConnections(nodeId) {
+      // Remettre toutes les arêtes à leur état normal
+      edges.forEach(edge => {
+        edges.update({ id: edge.id, color: { color: '#bdc3c7' } });
+      });
 
-function addNode() {
-  const nodeId = document.getElementById('node-id').value.trim().toUpperCase();
-  
-  // Vérifier que l'ID du nœud est valide
-  if (!nodeId) {
-    alert('Veuillez entrer un ID de nœud valide.');
-    return;
-  }
-  
-  // Vérifier que le nœud n'existe pas déjà
-  if (graph[nodeId]) {
-    alert(`Le nœud ${nodeId} existe déjà.`);
-    return;
-  }
-  
-  // Ajouter le nœud au graphe
-  graph[nodeId] = {};
-  
-  // Ajouter le nœud à la visualisation
-  nodes.add({ id: nodeId, label: nodeId });
-  
-  // Mettre à jour les listes déroulantes
-  updateNodeSelectors();
-  
-  // Effacer le champ de saisie
-  document.getElementById('node-id').value = '';
-}
-
-function updateNodeSelectors() {
-  const nodeIds = Object.keys(graph);
-  
-  // Mettre à jour les listes déroulantes pour les arêtes
-  const fromSelect = document.getElementById('edge-from');
-  const toSelect = document.getElementById('edge-to');
-  
-  // Sauvegarder les valeurs actuelles
-  const fromValue = fromSelect.value;
-  const toValue = toSelect.value;
-  
-  // Vider les listes
-  fromSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
-  toSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
-  
-  // Ajouter les options
-  nodeIds.forEach(nodeId => {
-    fromSelect.innerHTML += `<option value="${nodeId}">${nodeId}</option>`;
-    toSelect.innerHTML += `<option value="${nodeId}">${nodeId}</option>`;
-  });
-  
-  // Restaurer les valeurs si elles existent toujours
-  if (nodeIds.includes(fromValue)) fromSelect.value = fromValue;
-  if (nodeIds.includes(toValue)) toSelect.value = toValue;
-  
-  // Faire de même pour les nœuds de départ et d'arrivée
-  const startSelect = document.getElementById('start-node');
-  const endSelect = document.getElementById('end-node');
-  
-  const startValue = startSelect.value;
-  const endValue = endSelect.value;
-  
-  startSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
-  endSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
-  
-  nodeIds.forEach(nodeId => {
-    startSelect.innerHTML += `<option value="${nodeId}">${nodeId}</option>`;
-    endSelect.innerHTML += `<option value="${nodeId}">${nodeId}</option>`;
-  });
-  
-  if (nodeIds.includes(startValue)) startSelect.value = startValue;
-  if (nodeIds.includes(endValue)) endSelect.value = endValue;
-}
-
-function addParameter() {
-  const paramName = document.getElementById('new-param').value.trim().toLowerCase();
-  
-  // Vérifier que le nom du paramètre est valide
-  if (!paramName || paramName.length < 2) {
-    alert('Veuillez entrer un nom de paramètre valide (au moins 2 caractères).');
-    return;
-  }
-  
-  // Vérifier que le paramètre n'existe pas déjà
-  if (parameters.includes(paramName)) {
-    alert(`Le paramètre ${paramName} existe déjà.`);
-    return;
-  }
-  
-  // Ajouter le paramètre à la liste
-  parameters.push(paramName);
-  
-  // Mettre à jour l'interface
-  updateParameterTags();
-  updateEdgeParametersForm();
-  updateWeightSliders();
-  
-  // Effacer le champ de saisie
-  document.getElementById('new-param').value = '';
-}
-
-function removeParameter(paramName) {
-  // Ne pas supprimer si c'est le dernier paramètre
-  if (parameters.length <= 1) {
-    alert('Vous devez conserver au moins un paramètre.');
-    return;
-  }
-  
-  // Supprimer le paramètre de la liste
-  parameters = parameters.filter(p => p !== paramName);
-  
-  // Mettre à jour l'interface
-  updateParameterTags();
-  updateEdgeParametersForm();
-  updateWeightSliders();
-}
-
-function updateParameterTags() {
-  const container = document.getElementById('parameters-container');
-  container.innerHTML = '';
-  
-  parameters.forEach(param => {
-    const tag = document.createElement('div');
-    tag.className = 'parameter-tag';
-    tag.innerHTML = `
-      ${param}
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="remove-param"
-        data-param="${param}">
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-      </svg>
-    `;
-    container.appendChild(tag);
-    
-    // Ajouter l'écouteur d'événement pour le bouton de suppression
-    tag.querySelector('.remove-param').addEventListener('click', function() {
-      removeParameter(this.getAttribute('data-param'));
-    });
-  });
-}
-
-function updateEdgeParametersForm() {
-  const container = document.getElementById('edge-parameters');
-  container.innerHTML = '';
-  
-  parameters.forEach(param => {
-    const formGroup = document.createElement('div');
-    formGroup.className = 'form-group';
-    formGroup.innerHTML = `
-      <label for="edge-${param}">${param.charAt(0).toUpperCase() + param.slice(1)}</label>
-      <input type="number" id="edge-${param}" min="0" step="1" value="1">
-    `;
-    container.appendChild(formGroup);
-  });
-}
-
-function updateWeightSliders() {
-  const container = document.getElementById('weight-sliders');
-  container.innerHTML = '';
-  
-  // Déterminer la valeur initiale pour chaque slider (somme = 1)
-  const initialValue = 1 / parameters.length;
-  
-  parameters.forEach(param => {
-    const slider = document.createElement('div');
-    slider.className = 'weight-slider';
-    slider.innerHTML = `
-      <label for="weight-${param}">${param.charAt(0).toUpperCase() + param.slice(1)}</label>
-      <input type="range" id="weight-${param}" min="0" max="1" step="0.01" value="${initialValue.toFixed(2)}">
-      <span class="weight-value">${(initialValue * 100).toFixed(0)}%</span>
-    `;
-    container.appendChild(slider);
-    
-    // Ajouter l'écouteur d'événement pour mettre à jour le pourcentage
-    const rangeInput = slider.querySelector(`#weight-${param}`);
-    const valueSpan = slider.querySelector('.weight-value');
-    
-    rangeInput.addEventListener('input', function() {
-      valueSpan.textContent = `${(this.value * 100).toFixed(0)}%`;
-      normalizeWeights(param);
-    });
-  });
-}
-
-function normalizeWeights(changedParam) {
-  // Obtenir toutes les valeurs actuelles
-  const weights = {};
-  let total = 0;
-  
-  parameters.forEach(param => {
-    const value = parseFloat(document.getElementById(`weight-${param}`).value);
-    weights[param] = value;
-    total += value;
-  });
-  
-  // Si la somme est proche de 1, ne rien faire
-  if (Math.abs(total - 1) < 0.02) return;
-  
-  // Calculer le facteur d'ajustement pour les autres paramètres
-  const currentParamValue = weights[changedParam];
-  const otherParamsTotal = total - currentParamValue;
-  const remainingValue = 1 - currentParamValue;
-  
-  if (otherParamsTotal <= 0) {
-    // Cas spécial: tous les autres paramètres sont à 0
-    const otherParamCount = parameters.length - 1;
-    parameters.forEach(param => {
-      if (param !== changedParam) {
-        const newValue = remainingValue / otherParamCount;
-        document.getElementById(`weight-${param}`).value = newValue.toFixed(2);
-        document.querySelector(`#weight-${param} + .weight-value`).textContent = `${(newValue * 100).toFixed(0)}%`;
+      // Mettre en évidence les connexions du nœud sélectionné
+      if (graph[nodeId]) {
+        Object.keys(graph[nodeId]).forEach(neighbor => {
+          const edgeId = `${nodeId}-${neighbor}`;
+          edges.update({ id: edgeId, color: { color: '#2ecc71' } });
+        });
       }
-    });
-  } else {
-    // Ajuster proportionnellement les autres paramètres
-    parameters.forEach(param => {
-      if (param !== changedParam) {
-        const proportion = weights[param] / otherParamsTotal;
-        const newValue = remainingValue * proportion;
-        document.getElementById(`weight-${param}`).value = newValue.toFixed(2);
-        document.querySelector(`label[for="weight-${param}"] + input + .weight-value`).textContent = `${(newValue * 100).toFixed(0)}%`;
+    }
+
+    function updateNodeSelectors() {
+      const nodeIds = Object.keys(graph);
+
+      // Mettre à jour les listes déroulantes pour les arêtes
+      const fromSelect = document.getElementById('edge-from');
+      const toSelect = document.getElementById('edge-to');
+
+      // Sauvegarder les valeurs actuelles
+      const fromValue = fromSelect.value;
+      const toValue = toSelect.value;
+
+      // Vider les listes
+      fromSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
+      toSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
+
+      // Ajouter les options
+      nodeIds.forEach(nodeId => {
+        fromSelect.innerHTML += `<option value="${nodeId}">${nodeId}</option>`;
+        toSelect.innerHTML += `<option value="${nodeId}">${nodeId}</option>`;
+      });
+
+      // Restaurer les valeurs si elles existent toujours
+      if (nodeIds.includes(fromValue)) fromSelect.value = fromValue;
+      if (nodeIds.includes(toValue)) toSelect.value = toValue;
+
+      // Faire de même pour les nœuds de départ et d'arrivée
+      const startSelect = document.getElementById('start-node');
+      const endSelect = document.getElementById('end-node');
+
+      const startValue = startSelect.value;
+      const endValue = endSelect.value;
+
+      startSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
+      endSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
+
+      nodeIds.forEach(nodeId => {
+        startSelect.innerHTML += `<option value="${nodeId}">${nodeId}</option>`;
+        endSelect.innerHTML += `<option value="${nodeId}">${nodeId}</option>`;
+      });
+
+      if (nodeIds.includes(startValue)) startSelect.value = startValue;
+      if (nodeIds.includes(endValue)) endSelect.value = endValue;
+    }
+
+    function addParameter() {
+      const paramName = document.getElementById('new-param').value.trim().toLowerCase();
+
+      // Vérifier que le nom du paramètre est valide
+      if (!paramName || paramName.length < 2) {
+        alert('Veuillez entrer un nom de paramètre valide (au moins 2 caractères).');
+        return;
       }
-    });
-  }
-}
 
-function addEdge() {
-  const fromNode = document.getElementById('edge-from').value;
-  const toNode = document.getElementById('edge-to').value;
-  
-  // Vérifier que les nœuds sont sélectionnés
-  if (!fromNode || !toNode) {
-    alert('Veuillez sélectionner les nœuds de départ et d\'arrivée.');
-    return;
-  }
-  
-  // Vérifier qu'ils sont différents
-  if (fromNode === toNode) {
-    alert('Les nœuds de départ et d\'arrivée doivent être différents.');
-    return;
-  }
-  
-  // Vérifier que la connexion n'existe pas déjà
-  if (graph[fromNode][toNode]) {
-    alert(`Une connexion de ${fromNode} vers ${toNode} existe déjà.`);
-    return;
-  }
-  
-  // Créer la connexion
-  if (!graph[fromNode]) graph[fromNode] = {};
-  
-  // Collecter les valeurs des paramètres
-  const edgeData = {};
-  parameters.forEach(param => {
-    const value = parseInt(document.getElementById(`edge-${param}`).value, 10) || 1;
-    edgeData[param] = value;
-  });
-  
-  // Ajouter au graphe
-  graph[fromNode][toNode] = edgeData;
-  
-  // Ajouter à la visualisation
-  const edgeLabel = parameters.map(p => `${p}: ${edgeData[p]}`).join('\n');
-  edges.add({ 
-    id: `${fromNode}-${toNode}`, 
-    from: fromNode, 
-    to: toNode, 
-    label: edgeLabel,
-    title: edgeLabel
-  });
-  
-  // Réinitialiser les champs
-  document.getElementById('edge-from').value = '';
-  document.getElementById('edge-to').value = '';
-  parameters.forEach(param => {
-    document.getElementById(`edge-${param}`).value = 1;
-  });
-}
-
-function runAlgorithm() {
-  const startNode = document.getElementById('start-node').value;
-  const endNode = document.getElementById('end-node').value;
-  
-  // Vérifier que les nœuds sont sélectionnés
-  if (!startNode || !endNode) {
-    alert('Veuillez sélectionner les nœuds de départ et d\'arrivée.');
-    return;
-  }
-  
-  // Collecter les pondérations
-  const weights = {};
-  parameters.forEach(param => {
-    weights[param] = parseFloat(document.getElementById(`weight-${param}`).value);
-  });
-  
-  // Exécuter l'algorithme
-  const result = rechercheLocaleMultiParametres(graph, startNode, endNode, weights);
-  
-  // Afficher les résultats
-  displayResults(result);
-  
-  // Mettre en évidence le chemin dans la visualisation
-  highlightPath(result.path);
-}
-
-function displayResults(result) {
-  const resultPanel = document.getElementById('result-panel');
-  resultPanel.classList.remove('hidden');
-  
-  // Afficher le chemin
-  document.getElementById('result-path').textContent = `Chemin: ${result.path.join(' → ')}`;
-  
-  // Afficher le message
-  document.getElementById('result-message').textContent = `Message: ${result.message}`;
-  
-  // Afficher les paramètres
-  const paramsTable = document.getElementById('result-parameters');
-  paramsTable.innerHTML = '';
-  
-  parameters.forEach(param => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${param.charAt(0).toUpperCase() + param.slice(1)}</td>
-      <td>${result.parametres[param] || 0}</td>
-    `;
-    paramsTable.appendChild(row);
-  });
-}
-
-function highlightPath(path) {
-  // Réinitialiser toutes les arêtes
-  edges.forEach(edge => {
-    edges.update({ id: edge.id, color: { color: '#bdc3c7' }, width: 2 });
-  });
-  
-  // Mettre en évidence le chemin
-  for (let i = 0; i < path.length - 1; i++) {
-    const fromNode = path[i];
-    const toNode = path[i + 1];
-    const edgeId = `${fromNode}-${toNode}`;
-    
-    edges.update({ 
-      id: edgeId, 
-      color: { color: '#e74c3c' }, 
-      width: 4
-    });
-  }
-  
-  // Mettre en évidence les nœuds du chemin
-  nodes.forEach(node => {
-    const inPath = path.includes(node.id);
-    nodes.update({ 
-      id: node.id, 
-      color: { 
-        background: inPath ? '#e74c3c' : '#3498db',
-        border: inPath ? '#c0392b' : '#2980b9'
-      },
-      font: {
-        color: '#ffffff',
-        size: inPath ? 16 : 14,
-        bold: inPath
+      // Vérifier que le paramètre n'existe pas déjà
+      if (parameters.includes(paramName)) {
+        alert(`Le paramètre ${paramName} existe déjà.`);
+        return;
       }
-    });
-  });
-}
 
-function resetGraph() {
-  if (confirm('Êtes-vous sûr de vouloir réinitialiser le graphe ? Toutes les données seront perdues.')) {
-    // Réinitialiser le graphe
-    graph = {};
-    
-    // Réinitialiser la visualisation
-    nodes.clear();
-    edges.clear();
-    
-    // Réinitialiser les listes déroulantes
-    updateNodeSelectors();
-    
-    // Masquer le panneau de résultats
-    document.getElementById('result-panel').classList.add('hidden');
-  }
-}
+      // Ajouter le paramètre à la liste
+      parameters.push(paramName);
 
-function loadExampleGraph() {
-  // Graphe d'exemple (basé sur votre fichier JavaScript)
-  graph = {
-    A: {
-      B: { distance: 12, cost: 30, time: 5, risk: 2 },
-      C: { distance: 6, cost: 60, time: 8, risk: 5 },
-    },
-    B: {
-      C: { distance: 9, cost: 15, time: 3, risk: 1 },
-      D: { distance: 20, cost: 90, time: 15, risk: 4 },
-      E: { distance: 17, cost: 70, time: 10, risk: 3 },
-    },
-    C: {
-      E: { distance: 14, cost: 50, time: 7, risk: 2 },
-    },
-    D: {
-      F: { distance: 40, cost: 100, time: 20, risk: 6 },
-    },
-    E: {
-      F: { distance: 50, cost: 97, time: 25, risk: 3 },
-    },
-    F: {},
-  };
-  
-  // Ajouter les nœuds à la visualisation
-  Object.keys(graph).forEach(nodeId => {
-    nodes.add({ id: nodeId, label: nodeId });
-  });
-  
-  // Ajouter les arêtes à la visualisation
-  Object.keys(graph).forEach(fromNode => {
-    Object.keys(graph[fromNode]).forEach(toNode => {
-      const edgeData = graph[fromNode][toNode];
-      const edgeLabel = Object.entries(edgeData)
-        .map(([key, value]) => `${key}: ${value}`)
-        .join('\n');
-        
-      edges.add({ 
-        id: `${fromNode}-${toNode}`, 
-        from: fromNode, 
-        to: toNode, 
+      // Mettre à jour l'interface
+      updateParameterTags();
+      updateEdgeParametersForm();
+      updateWeightSliders();
+
+      // Effacer le champ de saisie
+      document.getElementById('new-param').value = '';
+    }
+
+    function removeParameter(paramName) {
+      // Ne pas supprimer si c'est le dernier paramètre
+      if (parameters.length <= 1) {
+        alert('Vous devez conserver au moins un paramètre.');
+        return;
+      }
+
+      // Supprimer le paramètre de la liste
+      parameters = parameters.filter(p => p !== paramName);
+
+      // Mettre à jour l'interface
+      updateParameterTags();
+      updateEdgeParametersForm();
+      updateWeightSliders();
+    }
+
+    function updateParameterTags() {
+      const container = document.getElementById('parameters-container');
+      container.innerHTML = '';
+
+      parameters.forEach(param => {
+        const tag = document.createElement('div');
+        tag.className = 'parameter-tag';
+        tag.innerHTML = `
+          ${param}
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="remove-param"
+            data-param="${param}">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        `;
+        container.appendChild(tag);
+
+        // Ajouter l'écouteur d'événement pour le bouton de suppression
+        tag.querySelector('.remove-param').addEventListener('click', function () {
+          removeParameter(this.getAttribute('data-param'));
+        });
+      });
+    }
+
+    function updateEdgeParametersForm() {
+      const container = document.getElementById('edge-parameters');
+      container.innerHTML = '';
+
+      parameters.forEach(param => {
+        const formGroup = document.createElement('div');
+        formGroup.className = 'form-group';
+        formGroup.innerHTML = `
+          <label for="edge-${param}">${param.charAt(0).toUpperCase() + param.slice(1)}</label>
+          <input type="number" id="edge-${param}" min="0" step="1" value="1">
+        `;
+        container.appendChild(formGroup);
+      });
+    }
+
+    function updateWeightSliders() {
+      const container = document.getElementById('weight-sliders');
+      container.innerHTML = '';
+
+      // Déterminer la valeur initiale pour chaque slider (somme = 1)
+      const initialValue = 1 / parameters.length;
+
+      parameters.forEach(param => {
+        const slider = document.createElement('div');
+        slider.className = 'weight-slider';
+        slider.innerHTML = `
+          <label for="weight-${param}">${param.charAt(0).toUpperCase() + param.slice(1)}</label>
+          <input type="range" id="weight-${param}" min="0" max="1" step="0.01" value="${initialValue.toFixed(2)}">
+          <span class="weight-value">${(initialValue * 100).toFixed(0)}%</span>
+        `;
+        container.appendChild(slider);
+
+        // Ajouter l'écouteur d'événement pour mettre à jour le pourcentage
+        const rangeInput = slider.querySelector(`#weight-${param}`);
+        const valueSpan = slider.querySelector('.weight-value');
+
+        rangeInput.addEventListener('input', function () {
+          valueSpan.textContent = `${(this.value * 100).toFixed(0)}%`;
+          normalizeWeights(param);
+        });
+      });
+    }
+    function normalizeWeights(changedParam) {
+      // Obtenir toutes les valeurs actuelles
+      const weights = {};
+      let total = 0;
+
+      parameters.forEach(param => {
+        const value = parseFloat(document.getElementById(`weight-${param}`).value);
+        weights[param] = value;
+        total += value;
+      });
+
+      // Si la somme est proche de 1, ne rien faire
+      if (Math.abs(total - 1) < 0.02) return;
+
+      // Calculer le facteur d'ajustement pour les autres paramètres
+      const currentParamValue = weights[changedParam];
+      const otherParamsTotal = total - currentParamValue;
+      const remainingValue = 1 - currentParamValue;
+
+      if (otherParamsTotal <= 0) {
+        // Cas spécial: tous les autres paramètres sont à 0
+        const otherParamCount = parameters.length - 1;
+        parameters.forEach(param => {
+          if (param !== changedParam) {
+            const newValue = remainingValue / otherParamCount;
+            document.getElementById(`weight-${param}`).value = newValue.toFixed(2);
+            document.querySelector(`#weight-${param} + .weight-value`).textContent = `${(newValue * 100).toFixed(0)}%`;
+          }
+        });
+      } else {
+        // Ajuster proportionnellement les autres paramètres
+        parameters.forEach(param => {
+          if (param !== changedParam) {
+            const proportion = weights[param] / otherParamsTotal;
+            const newValue = remainingValue * proportion;
+            document.getElementById(`weight-${param}`).value = newValue.toFixed(2);
+            document.querySelector(`label[for="weight-${param}"] + input + .weight-value`).textContent = `${(newValue * 100).toFixed(0)}%`;
+          }
+        });
+      }
+    }
+
+    function addEdge() {
+      const fromNode = document.getElementById('edge-from').value;
+      const toNode = document.getElementById('edge-to').value;
+
+      // Vérifier que les nœuds sont sélectionnés
+      if (!fromNode || !toNode) {
+        alert('Veuillez sélectionner les nœuds de départ et d\'arrivée.');
+        return;
+      }
+
+      // Vérifier qu'ils sont différents
+      if (fromNode === toNode) {
+        alert('Les nœuds de départ et d\'arrivée doivent être différents.');
+        return;
+      }
+
+      // Vérifier que la connexion n'existe pas déjà
+      if (graph[fromNode][toNode]) {
+        alert(`Une connexion de ${fromNode} vers ${toNode} existe déjà.`);
+        return;
+      }
+
+      // Créer la connexion
+      if (!graph[fromNode]) graph[fromNode] = {};
+
+      // Collecter les valeurs des paramètres
+      const edgeData = {};
+      parameters.forEach(param => {
+        const value = parseInt(document.getElementById(`edge-${param}`).value, 10) || 1;
+        edgeData[param] = value;
+      });
+
+      // Ajouter au graphe
+      graph[fromNode][toNode] = edgeData;
+
+      // Ajouter à la visualisation
+      const edgeLabel = parameters.map(p => `${p}: ${edgeData[p]}`).join('\n');
+      edges.add({
+        id: `${fromNode}-${toNode}`,
+        from: fromNode,
+        to: toNode,
         label: edgeLabel,
         title: edgeLabel
       });
-    });
-  });
-  
-  // Mettre à jour les listes déroulantes
-  updateNodeSelectors();
-}
 
-// Implémentation de l'algorithme de recherche locale (copié depuis votre code)
-function rechercheLocaleMultiParametres(graph, start, end, weights) {
-  console.log(`\n===== DÉBUT DE LA RECHERCHE DE ${start} à ${end} =====`);
-  console.log("Pondérations utilisées:", weights);
-  
-  // Vérifier que les poids sont valides
-  const parametreNames = Object.keys(weights);
-  const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
-  
-  if (Math.abs(totalWeight - 1) > 0.001) {
-    console.log(`Attention: La somme des pondérations (${totalWeight}) n'est pas égale à 1. Normalisation automatique appliquée.`);
-    for (const param in weights) {
-      weights[param] = weights[param] / totalWeight;
+      // Réinitialiser les champs
+      document.getElementById('edge-from').value = '';
+      document.getElementById('edge-to').value = '';
+      parameters.forEach(param => {
+        document.getElementById(`edge-${param}`).value = 1;
+      });
     }
-    console.log("Pondérations normalisées:", weights);
-  }
-  
-  // Vérifications des entrées
-  if (!graph[start] || !graph[end]) {
-    console.log("Erreur: Nœuds de départ ou d'arrivée invalides");
-    return { 
-      path: [], 
-      parametres: {}, 
-      message: "Nœuds de départ ou d'arrivée invalides" 
-    };
-  }
-  
-  // Vérifier que tous les paramètres existent dans le graphe
-  let firstEdge = null;
-  for (const node in graph) {
-    for (const neighbor in graph[node]) {
-      firstEdge = graph[node][neighbor];
-      break;
+
+    function runAlgorithm() {
+      const startNode = document.getElementById('start-node').value;
+      const endNode = document.getElementById('end-node').value;
+
+      // Vérifier que les nœuds sont sélectionnés
+      if (!startNode || !endNode) {
+        alert('Veuillez sélectionner les nœuds de départ et d\'arrivée.');
+        return;
+      }
+
+      // Collecter les pondérations
+      const weights = {};
+      parameters.forEach(param => {
+        weights[param] = parseFloat(document.getElementById(`weight-${param}`).value);
+      });
+
+      // Exécuter l'algorithme
+      const result = rechercheLocaleMultiParametres(graph, startNode, endNode, weights);
+
+      // Afficher les résultats
+      displayResults(result);
+
+      // Mettre en évidence le chemin dans la visualisation
+      highlightPath(result.path);
     }
-    if (firstEdge) break;
-  }
-  
-  if (firstEdge) {
-    for (const param of parametreNames) {
-      if (firstEdge[param] === undefined) {
-        console.log(`Erreur: Le paramètre '${param}' n'existe pas dans le graphe`);
-        return { 
-          path: [], 
-          parametres: {}, 
-          message: `Le paramètre '${param}' n'existe pas dans le graphe` 
+
+    function displayResults(result) {
+      const resultPanel = document.getElementById('result-panel');
+      resultPanel.classList.remove('hidden');
+
+      // Afficher le chemin
+      document.getElementById('result-path').textContent = `Chemin: ${result.path.join(' → ')}`;
+
+      // Afficher le message
+      document.getElementById('result-message').textContent = `Message: ${result.message}`;
+
+      // Afficher les paramètres
+      const paramsTable = document.getElementById('result-parameters');
+      paramsTable.innerHTML = '';
+
+      parameters.forEach(param => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+      <td>${param.charAt(0).toUpperCase() + param.slice(1)}</td>
+      <td>${result.parametres[param] || 0}</td>
+    `;
+        paramsTable.appendChild(row);
+      });
+    }
+
+    function highlightPath(path) {
+      // Réinitialiser toutes les arêtes
+      edges.forEach(edge => {
+        edges.update({ id: edge.id, color: { color: '#bdc3c7' }, width: 2 });
+      });
+
+      // Mettre en évidence le chemin
+      for (let i = 0; i < path.length - 1; i++) {
+        const fromNode = path[i];
+        const toNode = path[i + 1];
+        const edgeId = `${fromNode}-${toNode}`;
+
+        edges.update({
+          id: edgeId,
+          color: { color: '#e74c3c' },
+          width: 4
+        });
+      }
+
+      // Mettre en évidence les nœuds du chemin
+      nodes.forEach(node => {
+        const inPath = path.includes(node.id);
+        nodes.update({
+          id: node.id,
+          color: {
+            background: inPath ? '#e74c3c' : '#3498db',
+            border: inPath ? '#c0392b' : '#2980b9'
+          },
+          font: {
+            color: '#ffffff',
+            size: inPath ? 16 : 14,
+            bold: inPath
+          }
+        });
+      });
+    }
+
+    function resetGraph() {
+      if (confirm('Êtes-vous sûr de vouloir réinitialiser le graphe ? Toutes les données seront perdues.')) {
+        // Réinitialiser le graphe
+        graph = {};
+
+        // Réinitialiser la visualisation
+        nodes.clear();
+        edges.clear();
+
+        // Réinitialiser les listes déroulantes
+        updateNodeSelectors();
+
+        // Masquer le panneau de résultats
+        document.getElementById('result-panel').classList.add('hidden');
+      }
+    }
+
+    function loadExampleGraph() {
+      // Graphe d'exemple (basé sur votre fichier JavaScript)
+      graph = {
+        A: {
+          B: { distance: 12, cost: 30, time: 5, risk: 2 },
+          C: { distance: 6, cost: 60, time: 8, risk: 5 },
+        },
+        B: {
+          C: { distance: 9, cost: 15, time: 3, risk: 1 },
+          D: { distance: 20, cost: 90, time: 15, risk: 4 },
+          E: { distance: 17, cost: 70, time: 10, risk: 3 },
+        },
+        C: {
+          E: { distance: 14, cost: 50, time: 7, risk: 2 },
+        },
+        D: {
+          F: { distance: 40, cost: 100, time: 20, risk: 6 },
+        },
+        E: {
+          F: { distance: 50, cost: 97, time: 25, risk: 3 },
+        },
+        F: {},
+      };
+
+      // Ajouter les nœuds à la visualisation
+      Object.keys(graph).forEach(nodeId => {
+        nodes.add({ id: nodeId, label: nodeId });
+      });
+
+      // Ajouter les arêtes à la visualisation
+      Object.keys(graph).forEach(fromNode => {
+        Object.keys(graph[fromNode]).forEach(toNode => {
+          const edgeData = graph[fromNode][toNode];
+          const edgeLabel = Object.entries(edgeData)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join('\n');
+
+          edges.add({
+            id: `${fromNode}-${toNode}`,
+            from: fromNode,
+            to: toNode,
+            label: edgeLabel,
+            title: edgeLabel
+          });
+        });
+      });
+
+      // Mettre à jour les listes déroulantes
+      updateNodeSelectors();
+    }
+
+    // Implémentation de l'algorithme de recherche locale (copié depuis votre code)
+    function rechercheLocaleMultiParametres(graph, start, end, weights) {
+      console.log(`\n===== DÉBUT DE LA RECHERCHE DE ${start} à ${end} =====`);
+      console.log("Pondérations utilisées:", weights);
+
+      // Vérifier que les poids sont valides
+      const parametreNames = Object.keys(weights);
+      const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
+
+      if (Math.abs(totalWeight - 1) > 0.001) {
+        console.log(`Attention: La somme des pondérations (${totalWeight}) n'est pas égale à 1. Normalisation automatique appliquée.`);
+        for (const param in weights) {
+          weights[param] = weights[param] / totalWeight;
+        }
+        console.log("Pondérations normalisées:", weights);
+      }
+
+      // Vérifications des entrées
+      if (!graph[start] || !graph[end]) {
+        console.log("Erreur: Nœuds de départ ou d'arrivée invalides");
+        return {
+          path: [],
+          parametres: {},
+          message: "Nœuds de départ ou d'arrivée invalides"
         };
       }
-    }
-  }
-  
-  // Normaliser les valeurs dans le graphe
-  const maxValues = {};
-  for (const param of parametreNames) {
-    maxValues[param] = findMaxValue(graph, param);
-    console.log(`Valeur maximale trouvée pour ${param}: ${maxValues[param]}`);
-  }
-  
-  // Initialisation
-  let currentNode = start;
-  let path = [currentNode];
-  const totalValues = {};
-  for (const param of parametreNames) {
-    totalValues[param] = 0;
-  }
-  let isStuck = false;
-  
-  console.log(`Départ du nœud ${currentNode}`);
-  
-  // Boucle principale - continue jusqu'à ce qu'on soit bloqué ou qu'on atteigne la destination
-  let iteration = 1;
-  while (!isStuck && currentNode !== end) {
-    console.log(`\n--- Itération ${iteration} ---`);
-    console.log(`Position actuelle: ${currentNode}`);
-    console.log(`Chemin parcouru jusqu'ici: ${path.join(' -> ')}`);
-    console.log("Valeurs totales actuelles:", totalValues);
-    
-    // Obtenir tous les voisins du nœud actuel
-    const neighbors = graph[currentNode];
-    
-    // Si aucun voisin, nous sommes bloqués
-    if (Object.keys(neighbors).length === 0) {
-      console.log(`Le nœud ${currentNode} n'a aucun voisin. Recherche bloquée.`);
-      return { 
-        path, 
-        parametres: totalValues, 
-        message: "Bloqué sans pouvoir atteindre la destination" 
+
+      // Vérifier que tous les paramètres existent dans le graphe
+      let firstEdge = null;
+      for (const node in graph) {
+        for (const neighbor in graph[node]) {
+          firstEdge = graph[node][neighbor];
+          break;
+        }
+        if (firstEdge) break;
+      }
+
+      if (firstEdge) {
+        for (const param of parametreNames) {
+          if (firstEdge[param] === undefined) {
+            console.log(`Erreur: Le paramètre '${param}' n'existe pas dans le graphe`);
+            return {
+              path: [],
+              parametres: {},
+              message: `Le paramètre '${param}' n'existe pas dans le graphe`
+            };
+          }
+        }
+      }
+
+      // Normaliser les valeurs dans le graphe
+      const maxValues = {};
+      for (const param of parametreNames) {
+        maxValues[param] = findMaxValue(graph, param);
+        console.log(`Valeur maximale trouvée pour ${param}: ${maxValues[param]}`);
+      }
+
+      // Initialisation
+      let currentNode = start;
+      let path = [currentNode];
+      const totalValues = {};
+      for (const param of parametreNames) {
+        totalValues[param] = 0;
+      }
+      let isStuck = false;
+
+      console.log(`Départ du nœud ${currentNode}`);
+
+      // Boucle principale - continue jusqu'à ce qu'on soit bloqué ou qu'on atteigne la destination
+      let iteration = 1;
+      while (!isStuck && currentNode !== end) {
+        console.log(`\n--- Itération ${iteration} ---`);
+        console.log(`Position actuelle: ${currentNode}`);
+        console.log(`Chemin parcouru jusqu'ici: ${path.join(' -> ')}`);
+        console.log("Valeurs totales actuelles:", totalValues);
+
+        // Obtenir tous les voisins du nœud actuel
+        const neighbors = graph[currentNode];
+
+        // Si aucun voisin, nous sommes bloqués
+        if (Object.keys(neighbors).length === 0) {
+          console.log(`Le nœud ${currentNode} n'a aucun voisin. Recherche bloquée.`);
+          return {
+            path,
+            parametres: totalValues,
+            message: "Bloqué sans pouvoir atteindre la destination"
+          };
+        }
+
+        console.log("Évaluation des voisins disponibles:");
+
+        // Trouver le meilleur voisin selon les critères pondérés
+        let bestNeighbor = null;
+        let bestScore = Infinity;
+
+        for (const neighbor in neighbors) {
+          // Éviter de revenir sur un nœud déjà visité
+          if (path.includes(neighbor)) {
+            console.log(`  ${neighbor}: déjà visité, ignoré`);
+            continue;
+          }
+
+          // Calculer le score combiné pour tous les paramètres
+          let score = 0;
+          const normalizedValues = {};
+
+          console.log(`  ${neighbor}: `);
+          for (const param of parametreNames) {
+            const value = neighbors[neighbor][param];
+            const normalizedValue = value / maxValues[param];
+            normalizedValues[param] = normalizedValue;
+            score += weights[param] * normalizedValue;
+
+            console.log(`    ${param}=${value}, normalisé=${normalizedValue.toFixed(4)}`);
+          }
+
+          console.log(`    Score combiné = ${score.toFixed(4)}`);
+
+          if (score < bestScore) {
+            bestScore = score;
+            bestNeighbor = neighbor;
+            console.log(`    ✓ Meilleur voisin pour l'instant: ${bestNeighbor} (score: ${bestScore.toFixed(4)})`);
+          } else {
+            console.log(`    ✗ Score moins bon que ${bestNeighbor} (${bestScore.toFixed(4)})`);
+          }
+        }
+
+        // Si aucun meilleur voisin n'est trouvé, nous sommes bloqués
+        if (bestNeighbor === null) {
+          console.log("Aucun voisin disponible. Recherche bloquée dans un minimum local.");
+          isStuck = true;
+          break;
+        }
+
+        // Se déplacer vers le meilleur voisin
+        console.log(`\nDéplacement de ${currentNode} vers ${bestNeighbor} (meilleur score: ${bestScore.toFixed(4)})`);
+
+        // Mettre à jour les valeurs totales pour tous les paramètres
+        for (const param of parametreNames) {
+          const newValue = neighbors[bestNeighbor][param];
+          totalValues[param] += newValue;
+          console.log(`${param} ajouté: +${newValue}, Nouveau total: ${totalValues[param]}`);
+        }
+
+        currentNode = bestNeighbor;
+        path.push(currentNode);
+
+        // Si on a atteint la destination, on s'arrête
+        if (currentNode === end) {
+          console.log(`\nDestination ${end} atteinte!`);
+          break;
+        }
+
+        iteration++;
+      }
+
+      // Retourner le résultat
+      console.log(`\n===== FIN DE LA RECHERCHE =====`);
+      console.log(`Chemin final: ${path.join(' -> ')}`);
+      console.log("Valeurs totales finales:", totalValues);
+
+      const message = currentNode !== end ? "N'a pas pu atteindre la destination" :
+        isStuck ? "Bloqué dans un minimum local" : "Chemin trouvé";
+      console.log(`Statut: ${message}`);
+
+      return {
+        path,
+        parametres: totalValues,
+        message
       };
     }
-    
-    console.log("Évaluation des voisins disponibles:");
-    
-    // Trouver le meilleur voisin selon les critères pondérés
-    let bestNeighbor = null;
-    let bestScore = Infinity;
-    
-    for (const neighbor in neighbors) {
-      // Éviter de revenir sur un nœud déjà visité
-      if (path.includes(neighbor)) {
-        console.log(`  ${neighbor}: déjà visité, ignoré`);
-        continue;
-      }
-      
-      // Calculer le score combiné pour tous les paramètres
-      let score = 0;
-      const normalizedValues = {};
-      
-      console.log(`  ${neighbor}: `);
-      for (const param of parametreNames) {
-        const value = neighbors[neighbor][param];
-        const normalizedValue = value / maxValues[param];
-        normalizedValues[param] = normalizedValue;
-        score += weights[param] * normalizedValue;
-        
-        console.log(`    ${param}=${value}, normalisé=${normalizedValue.toFixed(4)}`);
-      }
-      
-      console.log(`    Score combiné = ${score.toFixed(4)}`);
-      
-      if (score < bestScore) {
-        bestScore = score;
-        bestNeighbor = neighbor;
-        console.log(`    ✓ Meilleur voisin pour l'instant: ${bestNeighbor} (score: ${bestScore.toFixed(4)})`);
-      } else {
-        console.log(`    ✗ Score moins bon que ${bestNeighbor} (${bestScore.toFixed(4)})`);
-      }
-    }
-    
-    // Si aucun meilleur voisin n'est trouvé, nous sommes bloqués
-    if (bestNeighbor === null) {
-      console.log("Aucun voisin disponible. Recherche bloquée dans un minimum local.");
-      isStuck = true;
-      break;
-    }
-    
-    // Se déplacer vers le meilleur voisin
-    console.log(`\nDéplacement de ${currentNode} vers ${bestNeighbor} (meilleur score: ${bestScore.toFixed(4)})`);
-    
-    // Mettre à jour les valeurs totales pour tous les paramètres
-    for (const param of parametreNames) {
-      const newValue = neighbors[bestNeighbor][param];
-      totalValues[param] += newValue;
-      console.log(`${param} ajouté: +${newValue}, Nouveau total: ${totalValues[param]}`);
-    }
-    
-    currentNode = bestNeighbor;
-    path.push(currentNode);
-    
-    // Si on a atteint la destination, on s'arrête
-    if (currentNode === end) {
-      console.log(`\nDestination ${end} atteinte!`);
-      break;
-    }
-    
-    iteration++;
-  }
-  
-  // Retourner le résultat
-  console.log(`\n===== FIN DE LA RECHERCHE =====`);
-  console.log(`Chemin final: ${path.join(' -> ')}`);
-  console.log("Valeurs totales finales:", totalValues);
-  
-  const message = currentNode !== end ? "N'a pas pu atteindre la destination" : 
-                  isStuck ? "Bloqué dans un minimum local" : "Chemin trouvé";
-  console.log(`Statut: ${message}`);
-  
-  return {
-    path,
-    parametres: totalValues,
-    message
-  };
-}
 
-// Fonction utilitaire pour trouver la valeur maximale d'un paramètre
-function findMaxValue(graph, parametre) {
-  let maxValue = 0;
-  for (const node in graph) {
-    for (const neighbor in graph[node]) {
-      if (graph[node][neighbor][parametre] > maxValue) {
-        maxValue = graph[node][neighbor][parametre];
+    // Fonction utilitaire pour trouver la valeur maximale d'un paramètre
+    function findMaxValue(graph, parametre) {
+      let maxValue = 0;
+      for (const node in graph) {
+        for (const neighbor in graph[node]) {
+          if (graph[node][neighbor][parametre] > maxValue) {
+            maxValue = graph[node][neighbor][parametre];
+          }
+        }
       }
+      return maxValue === 0 ? 1 : maxValue; // Éviter division par zéro
     }
-  }
-  return maxValue === 0 ? 1 : maxValue; // Éviter division par zéro
-}
   </script>
